@@ -15,18 +15,45 @@ import threading
 import webbrowser
 from pathlib import Path
 from typing import Optional
-import urllib.request
-import urllib.error
+
+try:
+    import requests
+except ImportError:
+    print("Installing required package: requests")
+    import subprocess
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "requests"])
+    import requests
 
 # API Configuration
 API_BASE_URL = "https://api.plantos.co"
 VERIFICATION_URL = "https://plantos.co"
 
+# SSL Certificate configuration
+# Use system CA bundle instead of certifi for better compatibility
+def get_ca_bundle():
+    """Get the appropriate CA bundle for SSL verification"""
+    import os
+
+    # Try system locations
+    system_certs = [
+        '/etc/ssl/cert.pem',  # macOS/BSD
+        '/etc/ssl/certs/ca-certificates.crt',  # Debian/Ubuntu/Gentoo
+        '/etc/pki/tls/certs/ca-bundle.crt',  # Fedora/RHEL
+       '/etc/ssl/ca-bundle.pem',  # OpenSUSE
+    ]
+
+    for cert_path in system_certs:
+        if os.path.exists(cert_path):
+            return cert_path
+
+    # Fall back to requests default (uses certifi)
+    return True
+
 class PlantosInstaller:
     def __init__(self, root):
         self.root = root
         self.root.title("Plantos MCP Desktop Installer")
-        self.root.geometry("600x500")
+        self.root.geometry("600x600")
         self.root.resizable(False, False)
 
         # State
@@ -110,7 +137,7 @@ class PlantosInstaller:
                                 text="Install Plantos MCP",
                                 style='Primary.TButton',
                                 command=self.start_installation)
-        install_btn.pack(pady=10, ipadx=20, ipady=10)
+        install_btn.pack(pady=10, ipadx=40, ipady=15)
 
     def show_authorization_screen(self):
         """Show authorization code and instructions"""
@@ -189,7 +216,7 @@ class PlantosInstaller:
                               text="Close",
                               style='Primary.TButton',
                               command=self.root.quit)
-        close_btn.pack(pady=20, ipadx=30, ipady=10)
+        close_btn.pack(pady=20, ipadx=40, ipady=15)
 
     def show_error_screen(self, error_message: str):
         """Show error message"""
@@ -216,7 +243,7 @@ class PlantosInstaller:
                               text="Try Again",
                               style='Primary.TButton',
                               command=self.show_welcome_screen)
-        retry_btn.pack(pady=10, ipadx=20, ipady=10)
+        retry_btn.pack(pady=10, ipadx=40, ipady=15)
 
     def clear_content(self):
         """Clear content frame"""
@@ -266,12 +293,14 @@ class PlantosInstaller:
         """Request authorization code from API"""
         try:
             url = f"{API_BASE_URL}/api/v1/mcp/request-code"
-            req = urllib.request.Request(url, method='POST')
-            req.add_header('Content-Type', 'application/json')
-
-            with urllib.request.urlopen(req) as response:
-                data = json.loads(response.read().decode())
-                return data
+            response = requests.post(
+                url,
+                headers={'Content-Type': 'application/json'},
+                timeout=10,
+                verify=get_ca_bundle()
+            )
+            response.raise_for_status()
+            return response.json()
         except Exception as e:
             print(f"Error requesting code: {e}")
             return None
@@ -283,19 +312,21 @@ class PlantosInstaller:
         while self.polling and (time.time() - start_time) < timeout:
             try:
                 url = f"{API_BASE_URL}/api/v1/mcp/check-code?code={self.auth_code}"
-                req = urllib.request.Request(url)
+                response = requests.get(url, timeout=10, verify=get_ca_bundle())
 
-                with urllib.request.urlopen(req) as response:
-                    data = json.loads(response.read().decode())
-
-                    if data['status'] == 'authorized':
-                        return data['api_key']
-                    elif data['status'] == 'expired':
-                        raise Exception("Authorization code expired")
-
-            except urllib.error.HTTPError as e:
-                if e.code == 404:
+                if response.status_code == 404:
                     raise Exception("Invalid authorization code")
+
+                response.raise_for_status()
+                data = response.json()
+
+                if data['status'] == 'authorized':
+                    return data['api_key']
+                elif data['status'] == 'expired':
+                    raise Exception("Authorization code expired")
+
+            except requests.exceptions.RequestException as e:
+                print(f"Polling error: {e}")
 
             time.sleep(3)  # Poll every 3 seconds
 
