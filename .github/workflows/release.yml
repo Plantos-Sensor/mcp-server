@@ -1,0 +1,142 @@
+name: Build and Release MCP Installer
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'  # Triggers on version tags like v1.0.0
+  workflow_dispatch:  # Allow manual trigger
+
+jobs:
+  build:
+    name: Build for ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            artifact_name: plantos-mcp-installer-macos.zip
+            asset_name: plantos-mcp-installer-macos.zip
+          - os: windows-latest
+            artifact_name: plantos-mcp-installer-windows.zip
+            asset_name: plantos-mcp-installer-windows.zip
+          - os: ubuntu-latest
+            artifact_name: plantos-mcp-installer-linux.tar.gz
+            asset_name: plantos-mcp-installer-linux.tar.gz
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+
+      - name: Build installer (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Build installer (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          .\build.bat
+
+      - name: Build installer (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Package installer (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd dist
+          zip -r plantos-mcp-installer-macos.zip "Plantos MCP Installer.app"
+
+      - name: Package installer (Windows)
+        if: matrix.os == 'windows-latest'
+        run: |
+          cd dist
+          7z a plantos-mcp-installer-windows.zip plantos-mcp-installer.exe
+
+      - name: Package installer (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          cd dist
+          tar -czf plantos-mcp-installer-linux.tar.gz plantos-mcp-installer
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: dist/${{ matrix.artifact_name }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Display structure of downloaded files
+        run: ls -R artifacts
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            artifacts/plantos-mcp-installer-macos.zip/plantos-mcp-installer-macos.zip
+            artifacts/plantos-mcp-installer-windows.zip/plantos-mcp-installer-windows.zip
+            artifacts/plantos-mcp-installer-linux.tar.gz/plantos-mcp-installer-linux.tar.gz
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          body: |
+            ## Plantos MCP Desktop Installer
+
+            One-click installer to connect Plantos agricultural intelligence to Claude Desktop.
+
+            ### Installation
+
+            **macOS:**
+            1. Download `plantos-mcp-installer-macos.zip`
+            2. Unzip and open `Plantos MCP Installer.app`
+            3. Follow the on-screen instructions
+
+            **Windows:**
+            1. Download `plantos-mcp-installer-windows.zip`
+            2. Extract and run `plantos-mcp-installer.exe`
+            3. Follow the on-screen instructions
+
+            **Linux:**
+            1. Download `plantos-mcp-installer-linux.tar.gz`
+            2. Extract: `tar -xzf plantos-mcp-installer-linux.tar.gz`
+            3. Run: `./plantos-mcp-installer`
+
+            ### What's Included
+
+            - 🌾 Agricultural data analysis tools
+            - 📊 Crop yield predictions
+            - 🌱 Soil health insights
+            - 🌤️ Weather data integration
+            - 📈 Market intelligence
+
+            For more information, visit [plantos.co](https://plantos.co)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
