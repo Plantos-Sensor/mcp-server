@@ -1,15 +1,50 @@
 [project]
-name = "plantos-mcp-server"
+name = "plantos-mcp"
 version = "1.0.0"
-description = "MCP server exposing Plantos agricultural intelligence API as tools for Claude and other AI assistants"
+description = "Agricultural intelligence MCP server for Claude Desktop - soil analysis, weather data, crop predictions, and AI-powered farming recommendations"
 readme = "README.md"
 requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Plantos", email = "support@plantos.co"}
+]
+keywords = [
+    "mcp",
+    "model-context-protocol",
+    "claude",
+    "agriculture",
+    "farming",
+    "ai",
+    "soil-analysis",
+    "weather",
+    "crop-prediction"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Atmospheric Science",
+    "Topic :: Scientific/Engineering :: GIS",
+]
 dependencies = [
     "mcp>=1.0.0",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
 ]
+
+[project.urls]
+Homepage = "https://plantos.co"
+Documentation = "https://github.com/Plantos-Sensor/mcp-server#readme"
+Repository = "https://github.com/Plantos-Sensor/mcp-server"
+Download = "https://plantos.co/mcp/download"
+"Bug Tracker" = "https://github.com/Plantos-Sensor/mcp-server/issues"
 
 [project.optional-dependencies]
 dev = [
@@ -22,4 +57,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project.scripts]
-plantos-mcp = "plantos_mcp_server:main"
+plantos-mcp = "plantos_mcp:main"
