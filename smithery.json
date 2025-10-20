@@ -1,0 +1,54 @@
+{
+  "name": "plantos-mcp",
+  "displayName": "Plantos Agricultural Intelligence",
+  "description": "Agricultural intelligence MCP server providing soil analysis, weather data, crop predictions, and AI-powered farming recommendations",
+  "version": "1.0.0",
+  "icon": "🌾",
+  "author": {
+    "name": "Plantos",
+    "url": "https://plantos.co"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Plantos-Sensor/mcp-server"
+  },
+  "homepage": "https://plantos.co/mcp/download",
+  "license": "MIT",
+  "runtime": "python",
+  "pythonPackage": {
+    "name": "plantos-mcp",
+    "version": "1.0.0",
+    "pypi": "https://pypi.org/project/plantos-mcp/"
+  },
+  "capabilities": {
+    "tools": true,
+    "resources": false,
+    "prompts": false
+  },
+  "tools": [
+    {
+      "name": "analyze_farm_location",
+      "description": "Comprehensive agricultural analysis for a specific location including soil properties, crop yield predictions, weather data, market intelligence, and AI-generated recommendations"
+    },
+    {
+      "name": "get_weather_data",
+      "description": "Get current and forecast weather data for agricultural decision-making"
+    },
+    {
+      "name": "get_soil_data",
+      "description": "Retrieve detailed soil properties and analysis for a specific location"
+    },
+    {
+      "name": "predict_crop_yield",
+      "description": "AI-powered crop yield predictions based on location, crop type, and environmental conditions"
+    }
+  ],
+  "configuration": {
+    "required": [
+      "PLANTOS_API_KEY"
+    ],
+    "optional": [
+      "PLANTOS_API_URL"
+    ]
+  }
+}
