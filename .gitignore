@@ -45,3 +45,4 @@ htmlcov/
 
 # macOS
 .DS_Store
+claude_desktop_config.json
