@@ -53,25 +53,45 @@ if [ "$(uname)" == "Darwin" ]; then
 
             # Submit for notarization
             echo "Submitting to Apple notarization service..."
-            xcrun notarytool submit "$NOTARIZE_ZIP" \
+            SUBMISSION_OUTPUT=$(xcrun notarytool submit "$NOTARIZE_ZIP" \
                 --apple-id "$APPLE_ID" \
                 --password "$APPLE_APP_PASSWORD" \
                 --team-id "${APPLE_TEAM_ID:-66872JU2N9}" \
-                --wait
+                --wait 2>&1)
 
             NOTARIZE_STATUS=$?
+            echo "$SUBMISSION_OUTPUT"
+
+            # Extract submission ID for log retrieval
+            SUBMISSION_ID=$(echo "$SUBMISSION_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
 
             # Clean up zip
             rm "$NOTARIZE_ZIP"
 
             if [ $NOTARIZE_STATUS -eq 0 ]; then
                 echo "Stapling notarization ticket to app..."
-                xcrun stapler staple "$APP_PATH"
-
-                echo "✅ Notarization complete!"
+                if xcrun stapler staple "$APP_PATH" 2>&1; then
+                    echo "✅ Notarization complete!"
+                else
+                    echo "⚠️  Stapling failed, but notarization succeeded"
+                    echo "   The app is still notarized and will work"
+                fi
             else
+                echo ""
                 echo "⚠️  Notarization failed - app is signed but not notarized"
-                echo "   Users may see a security warning on first launch"
+
+                if [ ! -z "$SUBMISSION_ID" ]; then
+                    echo "📋 Fetching notarization log..."
+                    xcrun notarytool log "$SUBMISSION_ID" \
+                        --apple-id "$APPLE_ID" \
+                        --password "$APPLE_APP_PASSWORD" \
+                        --team-id "${APPLE_TEAM_ID:-66872JU2N9}" 2>&1 || true
+                fi
+
+                echo ""
+                echo "   The app is still signed and will work, but users will need to:"
+                echo "   • Right-click → Open (first launch only)"
+                echo "   • Or run: xattr -cr 'Plantos MCP Installer.app'"
             fi
         else
             echo ""
