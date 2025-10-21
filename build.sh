@@ -30,15 +30,15 @@ if [ "$(uname)" == "Darwin" ]; then
         echo ""
         echo "🔐 Code signing macOS app..."
 
-        # Sign all binaries and frameworks inside the app
-        find "$APP_PATH/Contents/MacOS" -type f -perm +111 -exec codesign --force --deep --sign "$IDENTITY" --timestamp --options runtime {} \;
+        # Sign the main executable
+        codesign --force --sign "$IDENTITY" --timestamp --options runtime "$APP_PATH/Contents/MacOS/plantos-mcp-installer"
 
-        # Sign the entire app bundle
-        codesign --force --deep --sign "$IDENTITY" --timestamp --options runtime "$APP_PATH"
+        # Sign the entire app bundle (without --deep to avoid re-signing embedded frameworks)
+        codesign --force --sign "$IDENTITY" --timestamp --options runtime "$APP_PATH"
 
         # Verify the signature
         echo "Verifying signature..."
-        codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+        codesign --verify --strict --verbose=2 "$APP_PATH"
 
         echo "✅ Code signing complete!"
 
