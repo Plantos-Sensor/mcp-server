@@ -41,6 +41,44 @@ if [ "$(uname)" == "Darwin" ]; then
         codesign --verify --deep --strict --verbose=2 "$APP_PATH"
 
         echo "✅ Code signing complete!"
+
+        # Notarization (only if credentials are available)
+        if [ ! -z "$APPLE_ID" ] && [ ! -z "$APPLE_APP_PASSWORD" ]; then
+            echo ""
+            echo "📝 Notarizing app with Apple..."
+
+            # Create a zip for notarization
+            NOTARIZE_ZIP="dist/Plantos-MCP-Installer-notarize.zip"
+            ditto -c -k --keepParent "$APP_PATH" "$NOTARIZE_ZIP"
+
+            # Submit for notarization
+            echo "Submitting to Apple notarization service..."
+            xcrun notarytool submit "$NOTARIZE_ZIP" \
+                --apple-id "$APPLE_ID" \
+                --password "$APPLE_APP_PASSWORD" \
+                --team-id "${APPLE_TEAM_ID:-66872JU2N9}" \
+                --wait
+
+            NOTARIZE_STATUS=$?
+
+            # Clean up zip
+            rm "$NOTARIZE_ZIP"
+
+            if [ $NOTARIZE_STATUS -eq 0 ]; then
+                echo "Stapling notarization ticket to app..."
+                xcrun stapler staple "$APP_PATH"
+
+                echo "✅ Notarization complete!"
+            else
+                echo "⚠️  Notarization failed - app is signed but not notarized"
+                echo "   Users may see a security warning on first launch"
+            fi
+        else
+            echo ""
+            echo "ℹ️  Skipping notarization (APPLE_ID or APPLE_APP_PASSWORD not set)"
+            echo "   App is signed but not notarized"
+            echo "   Users will need to right-click → Open on first launch"
+        fi
     else
         echo ""
         echo "⚠️  No valid signing identity found - app will not be signed"

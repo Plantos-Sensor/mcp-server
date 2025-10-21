@@ -72,6 +72,9 @@ jobs:
           ./build.sh
         env:
           CODESIGN_IDENTITY: "Developer ID Application: Tyler Dennis (66872JU2N9)"
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Cleanup Keychain (macOS)
         if: matrix.os == 'macos-latest' && always()
