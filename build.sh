@@ -30,11 +30,11 @@ if [ "$(uname)" == "Darwin" ]; then
         echo ""
         echo "🔐 Code signing macOS app..."
 
-        # Sign the main executable
-        codesign --force --sign "$IDENTITY" --timestamp --options runtime "$APP_PATH/Contents/MacOS/plantos-mcp-installer"
+        # Sign the main executable (without --options runtime to allow embedded Python framework)
+        codesign --force --sign "$IDENTITY" --timestamp "$APP_PATH/Contents/MacOS/plantos-mcp-installer"
 
-        # Sign the entire app bundle (without --deep to avoid re-signing embedded frameworks)
-        codesign --force --sign "$IDENTITY" --timestamp --options runtime "$APP_PATH"
+        # Sign the entire app bundle (without hardened runtime due to PyInstaller's embedded frameworks)
+        codesign --force --sign "$IDENTITY" --timestamp "$APP_PATH"
 
         # Verify the signature
         echo "Verifying signature..."
