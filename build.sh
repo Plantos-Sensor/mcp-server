@@ -19,6 +19,36 @@ rm -rf build dist
 echo "Building installer..."
 pyinstaller installer.spec
 
+# Code signing for macOS
+if [ "$(uname)" == "Darwin" ]; then
+    APP_PATH="dist/Plantos MCP Installer.app"
+
+    # Check if a signing identity is available
+    IDENTITY="${CODESIGN_IDENTITY:-Developer ID Application: Tyler Dennis (66872JU2N9)}"
+
+    if security find-identity -v -p codesigning | grep -q "$IDENTITY"; then
+        echo ""
+        echo "🔐 Code signing macOS app..."
+
+        # Sign all binaries and frameworks inside the app
+        find "$APP_PATH/Contents/MacOS" -type f -perm +111 -exec codesign --force --deep --sign "$IDENTITY" --timestamp --options runtime {} \;
+
+        # Sign the entire app bundle
+        codesign --force --deep --sign "$IDENTITY" --timestamp --options runtime "$APP_PATH"
+
+        # Verify the signature
+        echo "Verifying signature..."
+        codesign --verify --deep --strict --verbose=2 "$APP_PATH"
+
+        echo "✅ Code signing complete!"
+    else
+        echo ""
+        echo "⚠️  No valid signing identity found - app will not be signed"
+        echo "   Identity needed: $IDENTITY"
+        echo "   Users will need to right-click → Open to run the app"
+    fi
+fi
+
 echo ""
 echo "✅ Build complete!"
 echo ""
