@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  plantos-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: plantos-mcp-server
+    ports:
+      - "${MCP_PORT:-8080}:8080"
+    environment:
+      - MCP_TRANSPORT=http
+      - PORT=8080
+      - HOST=0.0.0.0
+      - PLANTOS_API_URL=${PLANTOS_API_URL:-https://api.plantos.co}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.mcp.rule=Host(`${MCP_DOMAIN:-mcp.plantos.co}`)"
+      - "traefik.http.routers.mcp.entrypoints=websecure"
+      - "traefik.http.routers.mcp.tls.certresolver=letsencrypt"
+      - "traefik.http.services.mcp.loadbalancer.server.port=8080"
+
+  # Optional: Traefik reverse proxy for SSL/TLS
+  traefik:
+    image: traefik:v2.10
+    container_name: traefik
+    command:
+      - "--api.dashboard=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.letsencrypt.acme.tlschallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:-admin@plantos.co}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8081:8080"  # Traefik dashboard
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    restart: unless-stopped
+    profiles:
+      - with-proxy
+
+networks:
+  default:
+    name: plantos-network

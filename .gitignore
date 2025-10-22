@@ -46,3 +46,20 @@ htmlcov/
 # macOS
 .DS_Store
 claude_desktop_config.json
+*.p12
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Terraform/OpenTofu
+infrastructure/.terraform/
+infrastructure/.terraform.lock.hcl
+infrastructure/*.tfstate
+infrastructure/*.tfstate.*
+infrastructure/.terraformrc
+infrastructure/terraform.rc
+
+# SSL certificates
+letsencrypt/
