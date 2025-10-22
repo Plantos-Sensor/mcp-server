@@ -83,6 +83,6 @@ jobs:
           if curl -f http://$EC2_HOST:8080/health 2>/dev/null; then
             echo "✅ Deployment successful! MCP server is running."
           else
-            echo "⚠️  Server deployed but health check failed. Check logs with: ssh ec2-user@$EC2_HOST 'cd ~/plantos-mcp && docker-compose logs'"
+            echo "⚠️  Server deployed but health check failed. Check logs with: ssh admin@$EC2_HOST 'cd ~/plantos-mcp && docker logs plantos-mcp-server'"
             exit 1
           fi
