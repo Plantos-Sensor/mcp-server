@@ -8,7 +8,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
 COPY src/ ./src/
-COPY pyproject.toml .
+COPY pyproject.toml README.md ./
 
 # Install the package
 RUN pip install -e .
