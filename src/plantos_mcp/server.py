@@ -2,10 +2,13 @@
 """
 Plantos MCP Server
 Exposes agricultural intelligence API as MCP tools for Claude and other AI assistants
+
+Supports both stdio (local) and HTTP (remote) transport modes
 """
 import asyncio
 import os
-from typing import Any
+import sys
+from typing import Any, Optional
 import httpx
 from mcp.server.models import InitializationOptions
 from mcp.server import NotificationOptions, Server
@@ -18,16 +21,40 @@ from mcp.types import (
 )
 from pydantic import AnyUrl
 
+# For HTTP mode
+from fastapi import FastAPI, HTTPException, Header, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+import uvicorn
+
 
 # Configure API endpoint
-PLANTOS_API_BASE = os.getenv("PLANTOS_API_URL", "http://localhost:8000")
-PLANTOS_API_KEY = os.getenv("PLANTOS_API_KEY", "test-key-local-dev")
+PLANTOS_API_BASE = os.getenv("PLANTOS_API_URL", "https://api.plantos.co")
+PLANTOS_API_KEY = os.getenv("PLANTOS_API_KEY")
+TRANSPORT_MODE = os.getenv("MCP_TRANSPORT", "stdio")  # "stdio" or "http"
 
 # Create MCP server instance
-server = Server("plantos-agricultural-intelligence")
+mcp_server = Server("plantos-agricultural-intelligence")
+
+# Create FastAPI app for HTTP mode
+http_app = FastAPI(
+    title="Plantos MCP Server",
+    description="Remote MCP server for Plantos agricultural intelligence",
+    version="1.0.0"
+) if TRANSPORT_MODE == "http" else None
+
+if http_app:
+    # Add CORS middleware for Claude Desktop
+    http_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 
-@server.list_tools()
+@mcp_server.list_tools()
 async def handle_list_tools() -> list[Tool]:
     """
     List all available Plantos agricultural intelligence tools
@@ -210,7 +237,7 @@ async def handle_list_tools() -> list[Tool]:
     ]
 
 
-@server.call_tool()
+@mcp_server.call_tool()
 async def handle_call_tool(name: str, arguments: dict | None) -> list[TextContent | ImageContent | EmbeddedResource]:
     """
     Handle tool execution requests from MCP clients
@@ -422,6 +449,28 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
 
     except httpx.HTTPStatusError as e:
         error_detail = e.response.text
+
+        # Handle authentication errors
+        if e.response.status_code in [401, 403]:
+            return [
+                TextContent(
+                    type="text",
+                    text=f"""# Authentication Error
+
+Your Plantos API key is invalid or your subscription has expired.
+
+**To use Plantos agricultural intelligence:**
+1. Sign in or create an account at https://plantos.co
+2. Subscribe to a plan at https://plantos.co/billing
+3. Copy your API key from your dashboard
+4. Update your MCP configuration with the new API key
+
+**Error details:** {error_detail}
+"""
+                )
+            ]
+
+        # Handle other API errors
         return [
             TextContent(
                 type="text",
@@ -582,16 +631,83 @@ def _format_dict_recursive(data: dict, indent: int = 0) -> str:
     return "\n".join(lines)
 
 
-async def main():
-    """Run the MCP server"""
+# HTTP mode endpoints (if enabled)
+if http_app:
+    async def verify_api_key(x_api_key: Optional[str] = Header(None)):
+        """Verify API key for HTTP mode"""
+        if not x_api_key:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail={
+                    "error": "missing_api_key",
+                    "message": "API key required to use Plantos MCP server",
+                    "instructions": "Get your API key by subscribing at https://plantos.co/billing"
+                }
+            )
+        # In HTTP mode, we just pass the key through to the backend API
+        # The backend API will validate it
+        return x_api_key
+
+    @http_app.get("/health")
+    async def health_check():
+        """Health check endpoint"""
+        return {"status": "healthy", "mode": "http", "version": "1.0.0"}
+
+    @http_app.post("/mcp/list-tools")
+    async def http_list_tools(api_key: str = Header(None, alias="X-API-Key")):
+        """List available MCP tools (HTTP transport)"""
+        await verify_api_key(api_key)
+        tools = await handle_list_tools()
+        return {"tools": [tool.model_dump() for tool in tools]}
+
+    @http_app.post("/mcp/call-tool")
+    async def http_call_tool(
+        request: Request,
+        api_key: str = Header(None, alias="X-API-Key")
+    ):
+        """Execute an MCP tool (HTTP transport)"""
+        await verify_api_key(api_key)
+
+        body = await request.json()
+        tool_name = body.get("name")
+        arguments = body.get("arguments", {})
+
+        if not tool_name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Missing 'name' field"
+            )
+
+        # Temporarily override PLANTOS_API_KEY for this request
+        global PLANTOS_API_KEY
+        original_key = PLANTOS_API_KEY
+        PLANTOS_API_KEY = api_key
+
+        try:
+            result = await handle_call_tool(tool_name, arguments)
+            return {
+                "content": [content.model_dump() for content in result],
+                "isError": False
+            }
+        except Exception as e:
+            return {
+                "content": [{"type": "text", "text": f"Error: {str(e)}"}],
+                "isError": True
+            }
+        finally:
+            PLANTOS_API_KEY = original_key
+
+
+async def main_stdio():
+    """Run the MCP server in stdio mode (local)"""
     async with stdio_server() as (read_stream, write_stream):
-        await server.run(
+        await mcp_server.run(
             read_stream,
             write_stream,
             InitializationOptions(
                 server_name="plantos-agricultural-intelligence",
                 server_version="1.0.0",
-                capabilities=server.get_capabilities(
+                capabilities=mcp_server.get_capabilities(
                     notification_options=NotificationOptions(),
                     experimental_capabilities={},
                 ),
@@ -599,5 +715,23 @@ async def main():
         )
 
 
+def main_http():
+    """Run the MCP server in HTTP mode (remote)"""
+    port = int(os.getenv("PORT", "8080"))
+    host = os.getenv("HOST", "0.0.0.0")
+
+    uvicorn.run(
+        http_app,
+        host=host,
+        port=port,
+        log_level="info"
+    )
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    if TRANSPORT_MODE == "http":
+        print(f"Starting Plantos MCP Server in HTTP mode on port {os.getenv('PORT', '8080')}")
+        main_http()
+    else:
+        print("Starting Plantos MCP Server in stdio mode", file=sys.stderr)
+        asyncio.run(main_stdio())
