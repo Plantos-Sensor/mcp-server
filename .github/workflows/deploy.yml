@@ -4,7 +4,7 @@ on:
   push:
     branches:
       - main
-  workflow_dispatch:  # Allow manual trigger
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -15,73 +15,59 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
-
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build, tag, and push Docker image to ECR
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          IMAGE_TAG: ${{ github.sha }}
-        run: |
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-
       - name: Deploy to EC2
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ${{ secrets.EC2_USER }}
           EC2_SSH_KEY: ${{ secrets.EC2_SSH_KEY }}
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-          PLANTOS_API_URL: ${{ secrets.PLANTOS_API_URL }}
         run: |
           # Save SSH key
           echo "$EC2_SSH_KEY" > ec2_key.pem
           chmod 600 ec2_key.pem
 
           # Deploy via SSH
-          ssh -i ec2_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
-            # Login to ECR
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
+          ssh -i ec2_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'ENDSSH'
+            set -e
 
-            # Pull latest image
-            docker pull ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+            # Create app directory
+            mkdir -p ~/plantos-mcp
+            cd ~/plantos-mcp
 
-            # Stop and remove old container
-            docker stop plantos-mcp || true
-            docker rm plantos-mcp || true
+            # Clone or update repository
+            if [ -d ".git" ]; then
+              echo "Updating existing repository..."
+              git pull origin main
+            else
+              echo "Cloning repository..."
+              git clone https://github.com/Plantos-Sensor/mcp-server.git .
+            fi
 
-            # Run new container
-            docker run -d \
-              --name plantos-mcp \
-              --restart unless-stopped \
-              -p 8080:8080 \
-              -e MCP_TRANSPORT=http \
-              -e PLANTOS_API_URL=${{ secrets.PLANTOS_API_URL }} \
-              ${{ steps.login-ecr.outputs.registry }}/${{ secrets.ECR_REPOSITORY }}:latest
+            # Stop existing containers
+            docker-compose down || true
 
-            # Clean up old images
-            docker image prune -af
-          EOF
+            # Build and start containers
+            docker-compose up -d --build
+
+            # Show status
+            docker-compose ps
+
+            echo "✅ MCP server deployed successfully!"
+          ENDSSH
 
           # Clean up SSH key
           rm ec2_key.pem
 
       - name: Verify deployment
         env:
-          MCP_SERVER_URL: ${{ secrets.MCP_SERVER_URL }}
+          EC2_HOST: ${{ secrets.EC2_HOST }}
         run: |
-          sleep 10  # Wait for server to start
-          curl -f $MCP_SERVER_URL/health || exit 1
-          echo "✅ Deployment successful!"
+          echo "Waiting for server to start..."
+          sleep 15
+
+          # Check if server is responding
+          if curl -f http://$EC2_HOST:8080/health 2>/dev/null; then
+            echo "✅ Deployment successful! MCP server is running."
+          else
+            echo "⚠️  Server deployed but health check failed. Check logs with: ssh ec2-user@$EC2_HOST 'cd ~/plantos-mcp && docker-compose logs'"
+            exit 1
+          fi
