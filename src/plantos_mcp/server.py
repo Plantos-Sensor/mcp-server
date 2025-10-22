@@ -728,10 +728,15 @@ def main_http():
     )
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the MCP server"""
     if TRANSPORT_MODE == "http":
         print(f"Starting Plantos MCP Server in HTTP mode on port {os.getenv('PORT', '8080')}")
         main_http()
     else:
         print("Starting Plantos MCP Server in stdio mode", file=sys.stderr)
         asyncio.run(main_stdio())
+
+
+if __name__ == "__main__":
+    main()
