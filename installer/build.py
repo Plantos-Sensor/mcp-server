@@ -35,6 +35,8 @@ def build_installer(sign=False, identity=None):
         '--hidden-import=mcp',
         '--hidden-import=httpx',
         '--hidden-import=pydantic',
+        '--hidden-import=PIL',
+        '--hidden-import=PIL._tkinter_finder',
         '--clean',
     ]
 
