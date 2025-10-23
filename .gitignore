@@ -63,3 +63,17 @@ infrastructure/terraform.rc
 
 # SSL certificates
 letsencrypt/
+
+# Installer builds
+installer/build/
+installer/dist/
+installer/*.spec
+installer/*.dmg
+installer/*.exe
+installer/*.app
+
+# Certificates (NEVER COMMIT!)
+*.pem
+*.key
+*.certSigningRequest
+certificate.*
