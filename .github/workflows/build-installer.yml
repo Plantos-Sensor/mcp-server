@@ -124,7 +124,7 @@ jobs:
           python build.py
 
       - name: Sign executable (release only)
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && env.WINDOWS_CERTIFICATE_BASE64 != ''
         env:
           WINDOWS_CERTIFICATE_BASE64: ${{ secrets.WINDOWS_CERTIFICATE_BASE64 }}
           WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
@@ -133,11 +133,18 @@ jobs:
           echo $env:WINDOWS_CERTIFICATE_BASE64 | Out-File -Encoding ASCII certificate.txt
           certutil -decode certificate.txt certificate.pfx
 
-          # Sign executable
-          & 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.19041.0\x64\signtool.exe' sign /f certificate.pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td sha256 /fd sha256 installer\dist\PlantosMCPInstaller.exe
+          # Find signtool.exe dynamically
+          $signtool = Get-ChildItem "C:\Program Files (x86)\Windows Kits\10\bin\*\x64\signtool.exe" -Recurse -ErrorAction SilentlyContinue | Select-Object -First 1
+
+          if ($signtool) {
+            Write-Host "Found signtool at: $($signtool.FullName)"
+            & $signtool.FullName sign /f certificate.pfx /p $env:WINDOWS_CERTIFICATE_PASSWORD /tr http://timestamp.digicert.com /td sha256 /fd sha256 installer\dist\PlantosMCPInstaller.exe
+          } else {
+            Write-Warning "signtool.exe not found. Skipping code signing."
+          }
 
           # Clean up
-          Remove-Item certificate.txt, certificate.pfx
+          Remove-Item certificate.txt, certificate.pfx -ErrorAction SilentlyContinue
 
       - name: Create installer with Inno Setup
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
