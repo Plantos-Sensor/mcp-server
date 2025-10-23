@@ -48,22 +48,52 @@ class PlantosInstaller(tk.Tk):
             else:
                 base_path = Path(__file__).parent
 
-            icon_path = base_path / "sprout_icon_48.png"
+            # Use high-resolution source and downsample for better quality
+            icon_path = base_path / "sprout_icon_128.png"  # Use high-res 128px icon
             icon_image = Image.open(icon_path)
-            icon_photo = ImageTk.PhotoImage(icon_image)
+
+            # Add white circular background for contrast against green header
+            # Draw at 4x resolution for smooth anti-aliased edges, then downsample
+            from PIL import ImageDraw
+            final_size = 50  # Final display size
+            scale = 4  # Draw at 4x resolution for anti-aliasing
+            hi_res_size = final_size * scale  # 200px
+            circle_size = 46 * scale  # 184px
+            padding = (hi_res_size - circle_size) // 2
+
+            # Create high-resolution background with white circle
+            background = Image.new('RGBA', (hi_res_size, hi_res_size), (255, 255, 255, 0))
+            draw = ImageDraw.Draw(background)
+            # Draw white circle well within bounds
+            draw.ellipse([padding, padding, padding + circle_size - 1, padding + circle_size - 1],
+                        fill='white', outline='white')
+
+            # Paste the 128px icon centered in the circle (will be 32px when downsampled)
+            icon_offset = (hi_res_size - 128) // 2
+            background.paste(icon_image, (icon_offset, icon_offset), icon_image if icon_image.mode == 'RGBA' else None)
+
+            # Downsample to final size with high-quality Lanczos filter for smooth edges
+            background = background.resize((final_size, final_size), Image.Resampling.LANCZOS)
+
+            icon_photo = ImageTk.PhotoImage(background)
 
             # Container for icon and text
             title_container = tk.Frame(header_frame, bg="#16a34a")
             title_container.pack(pady=25)
 
-            # Icon
-            icon_label = tk.Label(
+            # Icon with white background - use Canvas for better control
+            from tkinter import Canvas
+            icon_canvas = Canvas(
                 title_container,
-                image=icon_photo,
-                bg="#16a34a"
+                width=final_size,
+                height=final_size,
+                bg="#16a34a",
+                highlightthickness=0,
+                relief='flat'
             )
-            icon_label.image = icon_photo  # Keep a reference to prevent garbage collection
-            icon_label.pack(side=tk.LEFT, padx=(0, 10))
+            icon_canvas.create_image(final_size//2, final_size//2, image=icon_photo)
+            icon_canvas.image = icon_photo  # Keep a reference to prevent garbage collection
+            icon_canvas.pack(side=tk.LEFT, padx=(0, 10))
 
             # Title text
             title_label = tk.Label(
