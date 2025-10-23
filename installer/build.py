@@ -53,16 +53,16 @@ def build_installer(sign=False, identity=None):
             ])
 
     elif system == "Windows":
-        options.extend([
-            '--version-file=version.txt',  # TODO: Create version file
-        ])
+        # Windows-specific options
+        # TODO: Add version file with '--version-file=version.txt'
+        pass
 
     print(f"Building installer for {system}...")
     print("This may take a few minutes...")
 
     try:
         PyInstaller.__main__.run(options)
-        print("\n✓ Build successful!")
+        print("\n[SUCCESS] Build successful!")
 
         # Post-build: Sign and notarize on macOS
         if system == "Darwin" and sign:
@@ -76,10 +76,10 @@ def build_installer(sign=False, identity=None):
                     print("\nNotarizing app...")
                     notarize_macos_app(app_path)
 
-        print(f"\n✓ Executable location: dist/PlantosMCPInstaller")
+        print(f"\n[SUCCESS] Executable location: dist/PlantosMCPInstaller")
 
     except Exception as e:
-        print(f"\n✗ Build failed: {e}")
+        print(f"\n[ERROR] Build failed: {e}")
         sys.exit(1)
 
 
@@ -111,10 +111,10 @@ def sign_macos_app(app_path: Path, identity: str):
             str(app_path)
         ])
 
-        print("✓ App signed successfully")
+        print("[SUCCESS] App signed successfully")
 
     except subprocess.CalledProcessError as e:
-        print(f"✗ Code signing failed: {e}")
+        print(f"[ERROR] Code signing failed: {e}")
         sys.exit(1)
 
 
@@ -134,7 +134,7 @@ def notarize_macos_app(app_path: Path):
     team_id = os.getenv("TEAM_ID")
 
     if not all([apple_id, password, team_id]):
-        print("⚠ Skipping notarization: Missing APPLE_ID, APPLE_ID_PASSWORD, or TEAM_ID")
+        print("[WARNING] Skipping notarization: Missing APPLE_ID, APPLE_ID_PASSWORD, or TEAM_ID")
         return
 
     try:
@@ -156,19 +156,19 @@ def notarize_macos_app(app_path: Path):
         ], capture_output=True, text=True)
 
         if result.returncode == 0:
-            print("✓ Notarization successful")
+            print("[SUCCESS] Notarization successful")
 
             # Staple the ticket
             subprocess.check_call([
                 'xcrun', 'stapler', 'staple', str(app_path)
             ])
-            print("✓ Notarization ticket stapled")
+            print("[SUCCESS] Notarization ticket stapled")
         else:
-            print(f"✗ Notarization failed:\n{result.stderr}")
+            print(f"[ERROR] Notarization failed:\n{result.stderr}")
             sys.exit(1)
 
     except subprocess.CalledProcessError as e:
-        print(f"✗ Notarization failed: {e}")
+        print(f"[ERROR] Notarization failed: {e}")
         sys.exit(1)
     finally:
         # Clean up zip
