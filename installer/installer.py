@@ -178,12 +178,15 @@ class PlantosInstaller(tk.Tk):
             text="Sign In to Plantos",
             command=self.start_signin,
             font=("Arial", 12, "bold"),
-            bg="#16a34a",
+            bg="#15803d",  # Darker green for better visibility
             fg="white",
-            relief=tk.FLAT,
+            relief=tk.RAISED,  # Raised relief for 3D effect
+            borderwidth=2,  # Visible border
             padx=30,
             pady=12,
-            cursor="hand2"
+            cursor="hand2",
+            activebackground="#14532d",  # Even darker when clicked
+            activeforeground="white"
         )
         self.signin_button.pack(pady=20)
 
@@ -291,8 +294,8 @@ class PlantosInstaller(tk.Tk):
                 base_path = Path(__file__).parent.parent
                 mcp_source = base_path / "src"
 
-            # Install MCP server locally
-            server_path = install_mcp_server(mcp_source)
+            # Install MCP server locally (creates venv and installs dependencies)
+            server_path, venv_python = install_mcp_server(mcp_source)
             self.update_status("Configuring AI assistants...")
             self.progress['value'] = 85
 
@@ -314,7 +317,8 @@ class PlantosInstaller(tk.Tk):
                 success = update_config(
                     config_path=config['path'],
                     api_key=self.api_key,
-                    mcp_server_path=server_path
+                    mcp_server_path=server_path,
+                    venv_python_path=venv_python
                 )
 
                 if success:

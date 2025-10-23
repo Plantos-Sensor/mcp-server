@@ -10,6 +10,8 @@ import os
 import sys
 from typing import Any, Optional
 import httpx
+import certifi
+import ssl
 from mcp.server.models import InitializationOptions
 from mcp.server import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
@@ -246,7 +248,7 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         arguments = {}
 
     try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
+        async with httpx.AsyncClient(timeout=60.0, verify=certifi.where()) as client:
             headers = {
                 "X-API-Key": PLANTOS_API_KEY,
                 "Content-Type": "application/json"

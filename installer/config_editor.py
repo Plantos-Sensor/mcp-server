@@ -101,10 +101,10 @@ def get_mcp_install_dir():
 
 def install_mcp_server(source_dir):
     """
-    Install MCP server files to local directory
+    Install MCP server files to local directory with virtual environment
     Args:
         source_dir: Directory containing MCP server source files
-    Returns: Path to installed server.py
+    Returns: Tuple of (Path to installed server.py, Path to venv Python)
     """
     install_dir = get_mcp_install_dir()
 
@@ -124,17 +124,35 @@ def install_mcp_server(source_dir):
             dest_path.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(item, dest_path)
 
-    # Install dependencies
-    requirements_file = install_dir / "requirements.txt"
-    if requirements_file.exists():
+    # Create virtual environment
+    venv_dir = install_dir / "venv"
+    if not venv_dir.exists():
+        print("Creating virtual environment...")
         try:
             subprocess.check_call([
-                "python3", "-m", "pip", "install", "-q", "-r", str(requirements_file)
-            ])
+                "python3", "-m", "venv", str(venv_dir)
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         except subprocess.CalledProcessError as e:
-            print(f"Warning: Failed to install dependencies: {e}")
+            raise RuntimeError(f"Failed to create virtual environment: {e}")
 
-    # Return path to server entry point
+    # Determine venv Python path
+    if platform.system() == "Windows":
+        venv_python = venv_dir / "Scripts" / "python.exe"
+    else:
+        venv_python = venv_dir / "bin" / "python3"
+
+    # Install dependencies into venv
+    requirements_file = install_dir / "requirements.txt"
+    if requirements_file.exists():
+        print("Installing dependencies...")
+        try:
+            subprocess.check_call([
+                str(venv_python), "-m", "pip", "install", "-q", "-r", str(requirements_file)
+            ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"Failed to install dependencies: {e}")
+
+    # Return path to server entry point and venv Python
     server_path = install_dir / "src/plantos_mcp/server.py"
     if not server_path.exists():
         # Fallback: try to find server.py
@@ -144,16 +162,17 @@ def install_mcp_server(source_dir):
         else:
             raise FileNotFoundError("Could not find server.py in installed MCP server")
 
-    return server_path
+    return server_path, venv_python
 
 
-def update_config(config_path, api_key, mcp_server_path):
+def update_config(config_path, api_key, mcp_server_path, venv_python_path=None):
     """
     Update AI assistant config with Plantos MCP settings
     Args:
         config_path: Path to config file
         api_key: User's Plantos API key
         mcp_server_path: Path to locally installed MCP server
+        venv_python_path: Path to venv Python binary (optional, defaults to system python3)
     Returns: True if successful
     """
     config_path = Path(config_path)
@@ -176,9 +195,12 @@ def update_config(config_path, api_key, mcp_server_path):
     if "mcpServers" not in config:
         config["mcpServers"] = {}
 
+    # Use venv Python if provided, otherwise system python3
+    python_cmd = str(venv_python_path) if venv_python_path else "python3"
+
     # Add Plantos MCP configuration for stdio (local) mode
     config["mcpServers"]["plantos"] = {
-        "command": "python3",
+        "command": python_cmd,
         "args": [str(mcp_server_path)],
         "env": {
             "PLANTOS_API_KEY": api_key,
