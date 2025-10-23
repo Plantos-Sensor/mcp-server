@@ -27,7 +27,7 @@ def build_installer(sign=False, identity=None):
         '--name=PlantosMCPInstaller',
         '--onefile',
         '--windowed',  # No console window
-        # TODO: Add icon file with '--icon=path/to/icon.icns'
+        '--icon=sprout_icon.icns',  # App icon for Finder, Dock, toolbar
         '--add-data=auth.py:.',
         '--add-data=config_editor.py:.',
         '--add-data=../src:src',  # Bundle MCP server source

@@ -71,6 +71,7 @@ installer/*.spec
 installer/*.dmg
 installer/*.exe
 installer/*.app
+installer/*.iconset/
 
 # Certificates (NEVER COMMIT!)
 *.pem
