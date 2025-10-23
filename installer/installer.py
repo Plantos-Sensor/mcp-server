@@ -10,6 +10,7 @@ import webbrowser
 import sys
 from pathlib import Path
 from threading import Thread
+from PIL import Image, ImageTk
 
 from auth import authenticate_user
 from config_editor import detect_configs, update_config, install_mcp_server
@@ -39,15 +40,52 @@ class PlantosInstaller(tk.Tk):
         header_frame.pack(fill=tk.X)
         header_frame.pack_propagate(False)
 
-        # Title with icon placeholder (will be replaced with actual Sprout icon image)
-        title_label = tk.Label(
-            header_frame,
-            text="Plantos MCP",
-            font=("Arial", 24, "bold"),
-            bg="#16a34a",
-            fg="white"
-        )
-        title_label.pack(pady=30)
+        # Load and display Sprout icon with title
+        try:
+            # Get path to icon file (works both from source and PyInstaller bundle)
+            if getattr(sys, 'frozen', False):
+                base_path = Path(sys._MEIPASS)
+            else:
+                base_path = Path(__file__).parent
+
+            icon_path = base_path / "sprout_icon_48.png"
+            icon_image = Image.open(icon_path)
+            icon_photo = ImageTk.PhotoImage(icon_image)
+
+            # Container for icon and text
+            title_container = tk.Frame(header_frame, bg="#16a34a")
+            title_container.pack(pady=25)
+
+            # Icon
+            icon_label = tk.Label(
+                title_container,
+                image=icon_photo,
+                bg="#16a34a"
+            )
+            icon_label.image = icon_photo  # Keep a reference to prevent garbage collection
+            icon_label.pack(side=tk.LEFT, padx=(0, 10))
+
+            # Title text
+            title_label = tk.Label(
+                title_container,
+                text="Plantos MCP",
+                font=("Arial", 24, "bold"),
+                bg="#16a34a",
+                fg="white"
+            )
+            title_label.pack(side=tk.LEFT)
+
+        except Exception as e:
+            # Fallback if icon can't be loaded
+            print(f"Could not load icon: {e}")
+            title_label = tk.Label(
+                header_frame,
+                text="Plantos MCP",
+                font=("Arial", 24, "bold"),
+                bg="#16a34a",
+                fg="white"
+            )
+            title_label.pack(pady=30)
 
         # Main content
         content_frame = tk.Frame(self, bg="#f5f5f5", padx=30, pady=20)

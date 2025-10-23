@@ -31,6 +31,7 @@ def build_installer(sign=False, identity=None):
         '--add-data=auth.py:.',
         '--add-data=config_editor.py:.',
         '--add-data=../src:src',  # Bundle MCP server source
+        '--add-data=sprout_icon_48.png:.',  # Bundle Sprout icon for header
         '--hidden-import=mcp',
         '--hidden-import=httpx',
         '--hidden-import=pydantic',
