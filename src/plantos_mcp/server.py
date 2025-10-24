@@ -12,6 +12,7 @@ from typing import Any, Optional
 import httpx
 import certifi
 import ssl
+import platform
 from mcp.server.models import InitializationOptions
 from mcp.server import NotificationOptions, Server
 from mcp.server.stdio import stdio_server
@@ -248,7 +249,14 @@ async def handle_call_tool(name: str, arguments: dict | None) -> list[TextConten
         arguments = {}
 
     try:
-        async with httpx.AsyncClient(timeout=60.0, verify=certifi.where()) as client:
+        # Use macOS system certificates on Darwin, certifi everywhere else
+        # This fixes SSL issues with conda/miniforge Python installations
+        if platform.system() == "Darwin":
+            ssl_cert_file = "/etc/ssl/cert.pem"
+        else:
+            ssl_cert_file = certifi.where()
+
+        async with httpx.AsyncClient(timeout=60.0, verify=ssl_cert_file) as client:
             headers = {
                 "X-API-Key": PLANTOS_API_KEY,
                 "Content-Type": "application/json"
